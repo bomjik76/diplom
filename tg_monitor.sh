@@ -41,23 +41,27 @@ get_system_info() {
     echo "$cpu_usage $memory_percent $disk_usage"
 }
 
-# Отправка тестового сообщения при запуске
+# Отправка тестового сообщения при запускеACA
 echo "Отправка тестового сообщения..."
-test_message="<b>🔄 Тестовое сообщение</b>Скрипт мониторинга сервера успешно запущен.Все каналы связи работают корректно."
+test_message="<b>🔄 Тестовое сообщение</b>
+Скрипт мониторинга сервера успешно запущен.
+Все каналы связи работают корректно."
 send_telegram "$test_message"
 echo "Тестовое сообщение отправлено."
 
 # Отправка текущего состояния системы
 echo "Отправка текущего состояния системы..."
 read cpu memory disk <<< $(get_system_info)
-message="<b>📊 Отчет о состоянии сервера</b>"
+message="<b>📊 Отчет о состоянии сервера</b>
+"
 message+="<b>🖥 CPU:</b> ${cpu}% "
 if (( $(echo "$cpu > $CPU_THRESHOLD" | bc -l) )); then
     message+="⚠️"
 else
     message+="✅"
 fi
-message+=""
+message+="
+"
 
 message+="<b>💾 Память:</b> ${memory}% "
 if (( $(echo "$memory > $MEMORY_THRESHOLD" | bc -l) )); then
@@ -65,7 +69,8 @@ if (( $(echo "$memory > $MEMORY_THRESHOLD" | bc -l) )); then
 else
     message+="✅"
 fi
-message+=""
+message+="
+"
 
 message+="<b>💿 Диск:</b> ${disk}% "
 if (( $(echo "$disk > $DISK_THRESHOLD" | bc -l) )); then
@@ -73,7 +78,8 @@ if (( $(echo "$disk > $DISK_THRESHOLD" | bc -l) )); then
 else
     message+="✅"
 fi
-message+=""
+message+="
+"
 
 message+="<b>⏰ Время:</b> $(date '+%d.%m.%Y %H:%M:%S')"
 send_telegram "$message"
@@ -84,14 +90,16 @@ while true; do
     read cpu memory disk <<< $(get_system_info)
     
     # Формирование сообщения
-    message="<b>📊 Отчет о состоянии сервера</b>"
+    message="<b>📊 Отчет о состоянии сервера</b>
+"
     message+="<b>🖥 CPU:</b> ${cpu}% "
     if (( $(echo "$cpu > $CPU_THRESHOLD" | bc -l) )); then
         message+="⚠️"
     else
         message+="✅"
     fi
-    message+=""
+    message+="
+"
     
     message+="<b>💾 Память:</b> ${memory}% "
     if (( $(echo "$memory > $MEMORY_THRESHOLD" | bc -l) )); then
@@ -99,7 +107,8 @@ while true; do
     else
         message+="✅"
     fi
-    message+=""
+    message+="
+"
     
     message+="<b>💿 Диск:</b> ${disk}% "
     if (( $(echo "$disk > $DISK_THRESHOLD" | bc -l) )); then
@@ -107,16 +116,22 @@ while true; do
     else
         message+="✅"
     fi
-    message+=""
+    message+="
+"
     
     message+="<b>⏰ Время:</b> $(date '+%d.%m.%Y %H:%M:%S')"
     
     # Проверка критических значений
     if (( $(echo "$cpu > $CPU_THRESHOLD" | bc -l) )) || (( $(echo "$memory > $MEMORY_THRESHOLD" | bc -l) )) || (( $(echo "$disk > $DISK_THRESHOLD" | bc -l) )); then
-        message+="⚠️ <b>ВНИМАНИЕ!</b> Превышены критические значения:"
-        (( $(echo "$cpu > $CPU_THRESHOLD" | bc -l) )) && message+="- CPU превышает ${CPU_THRESHOLD}% (Текущее: ${cpu}%)"
-        (( $(echo "$memory > $MEMORY_THRESHOLD" | bc -l) )) && message+="- Память превышает ${MEMORY_THRESHOLD}% (Текущее: ${memory}%)"
-        (( $(echo "$disk > $DISK_THRESHOLD" | bc -l) )) && message+="- Диск превышает ${DISK_THRESHOLD}% (Текущее: ${disk}%)"
+        message+="
+⚠️ <b>ВНИМАНИЕ!</b> Превышены критические значения:
+"
+        (( $(echo "$cpu > $CPU_THRESHOLD" | bc -l) )) && message+="- CPU превышает ${CPU_THRESHOLD}% (Текущее: ${cpu}%)
+"
+        (( $(echo "$memory > $MEMORY_THRESHOLD" | bc -l) )) && message+="- Память превышает ${MEMORY_THRESHOLD}% (Текущее: ${memory}%)
+"
+        (( $(echo "$disk > $DISK_THRESHOLD" | bc -l) )) && message+="- Диск превышает ${DISK_THRESHOLD}% (Текущее: ${disk}%)
+"
         
         # Отправка уведомлений
         send_telegram "$message"
