@@ -12,7 +12,6 @@ NC='\033[0m' # No Color
 
 # Глобальные переменные
 LOG_FILE="security_scan_$(date +%Y%m%d_%H%M%S).log"
-BACKUP_DIR="security_backups_$(date +%Y%m%d_%H%M%S)"
 REPORT_DIR="security_reports_$(date +%Y%m%d_%H%M%S)"
 TEMP_DIR="/tmp/security_scanner_$$"
 ERROR_COUNT=0
@@ -46,38 +45,6 @@ check_root() {
         echo -e "${RED}Этот скрипт должен быть запущен с правами root${NC}"
         exit 1
     fi
-}
-
-# Функция для создания резервных копий
-create_backups() {
-    print_header "Создание резервных копий конфигураций"
-    
-    mkdir -p "$BACKUP_DIR"
-    
-    # Список файлов для резервного копирования
-    local config_files=(
-        "/etc/ssh/sshd_config"
-        "/etc/selinux/config"
-        "/etc/firewalld/firewalld.conf"
-        "/etc/security/pwquality.conf"
-        "/etc/login.defs"
-        "/etc/audit/auditd.conf"
-        "/etc/sudoers"
-        "/boot/grub2/grub.cfg"
-    )
-    
-    for file in "${config_files[@]}"; do
-        if [ -f "$file" ]; then
-            cp --parents "$file" "$BACKUP_DIR/"
-            echo -e "${GREEN}Создана резервная копия: $file${NC}" | tee -a "$LOG_FILE"
-        fi
-    done
-    
-    # Архивирование резервных копий
-    tar -czf "${BACKUP_DIR}.tar.gz" -C "$(dirname "$BACKUP_DIR")" "$(basename "$BACKUP_DIR")"
-    rm -rf "$BACKUP_DIR"
-    
-    echo -e "${GREEN}Резервные копии сохранены в ${BACKUP_DIR}.tar.gz${NC}" | tee -a "$LOG_FILE"
 }
 
 # Функция для обработки ошибок
@@ -556,27 +523,6 @@ check_unused_accounts() {
     fi
 }
 
-# Проверка файлов cron
-check_cron() {
-    print_header "Проверка задач cron"
-    
-    echo -e "Системные задачи cron:" | tee -a "$LOG_FILE"
-    for dir in /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly; do
-        if [ -d "$dir" ]; then
-            echo -e "\nСодержимое $dir:" | tee -a "$LOG_FILE"
-            ls -la "$dir" | tee -a "$LOG_FILE"
-        fi
-    done
-    
-    echo -e "\nЗадачи crontab для пользователей:" | tee -a "$LOG_FILE"
-    if [ -f /var/spool/cron/root ]; then
-        echo -e "\nЗадачи crontab для root:" | tee -a "$LOG_FILE"
-        cat /var/spool/cron/root | tee -a "$LOG_FILE"
-    fi
-    
-    echo -e "\n${YELLOW}ВНИМАНИЕ: Проверьте задачи cron на наличие подозрительных записей.${NC}" | tee -a "$LOG_FILE"
-}
-
 # Проверка настроек GRUB
 check_grub() {
     print_header "Проверка настроек GRUB"
@@ -603,22 +549,6 @@ check_grub() {
     fi
 }
 
-# Проверка процессов с подозрительными именами
-check_suspicious_processes() {
-    print_header "Проверка подозрительных процессов"
-    
-    echo -e "Список запущенных процессов:" | tee -a "$LOG_FILE"
-    ps aux | tee -a "$LOG_FILE"
-    
-    # Проверка на процессы с подозрительными именами
-    echo -e "\nПоиск подозрительных процессов..." | tee -a "$LOG_FILE"
-    ps aux | grep -iE '(hack|malware|backdoor|trojan|rootkit)' | grep -v grep | tee -a "$LOG_FILE"
-    
-    # Проверка процессов без владельца
-    echo -e "\nПроцессы без владельца:" | tee -a "$LOG_FILE"
-    ps aux | awk '$1 == "?" {print}' | tee -a "$LOG_FILE"
-}
-
 # Проверка настроек yum.repos.d
 check_repositories() {
     print_header "Проверка репозиториев"
@@ -640,31 +570,6 @@ check_repositories() {
     else
         echo -e "${YELLOW}Каталог /etc/yum.repos.d не найден.${NC}" | tee -a "$LOG_FILE"
     fi
-}
-
-# Проверка на наличие вредоносных программ
-check_malware() {
-    print_header "Проверка на наличие вредоносных программ"
-    
-    if command -v rkhunter &>/dev/null; then
-        echo -e "Запуск rkhunter..." | tee -a "$LOG_FILE"
-        rkhunter --check --skip-keypress | tee -a "$LOG_FILE"
-    else
-        echo -e "${YELLOW}rkhunter не установлен. Рекомендуется установить для проверки на наличие руткитов.${NC}" | tee -a "$LOG_FILE"
-        echo -e "${YELLOW}sudo yum install rkhunter${NC}" | tee -a "$LOG_FILE"
-    fi
-    
-    # Проверка подозрительных процессов
-    echo -e "\nПроверка подозрительных процессов:" | tee -a "$LOG_FILE"
-    ps aux | grep -iE '(hack|malware|backdoor|trojan|rootkit)' | grep -v grep | tee -a "$LOG_FILE"
-    
-    # Проверка подозрительных файлов
-    echo -e "\nПоиск подозрительных файлов:" | tee -a "$LOG_FILE"
-    find / -type f -name "*.exe" -o -name "*.dll" -o -name "*.bat" -o -name "*.cmd" 2>/dev/null | tee -a "$LOG_FILE"
-    
-    # Проверка необычных открытых портов
-    echo -e "\nПроверка открытых портов:" | tee -a "$LOG_FILE"
-    netstat -tuln 2>/dev/null | grep -v "127.0.0.1" | tee -a "$LOG_FILE"
 }
 
 # Создание отчета с рекомендациями
@@ -775,6 +680,8 @@ generate_report() {
         echo "    <pre>$(grep ':0:' /etc/passwd)</pre>"
         echo "    <h3>Пользователи с правами sudo:</h3>"
         echo "    <pre>$(grep -Po '^sudo.+:\K.*$' /etc/group || echo 'Нет пользователей с правами sudo')</pre>"
+        echo "    <h3>История входов пользователя root:</h3>"
+        echo "    <pre>$(last root | head -n 20)</pre>"
         echo "  </div>"
         
         # Файловая система
@@ -838,9 +745,6 @@ main() {
     # Проверка зависимостей перед началом работы
     check_dependencies || handle_error "Ошибка при проверке зависимостей"
     
-    # Создание резервных копий
-    create_backups || handle_error "Ошибка при создании резервных копий"
-    
     # Выполнение проверок
     check_os_version || handle_warning "Ошибка при проверке версии ОС"
     check_selinux || handle_warning "Ошибка при проверке SELinux"
@@ -854,11 +758,8 @@ main() {
     check_setuid_files || handle_warning "Ошибка при проверке SUID/SGID файлов"
     check_uid_zero || handle_warning "Ошибка при проверке UID 0"
     check_unused_accounts || handle_warning "Ошибка при проверке неиспользуемых учетных записей"
-    check_cron || handle_warning "Ошибка при проверке cron"
     check_grub || handle_warning "Ошибка при проверке GRUB"
-    check_suspicious_processes || handle_warning "Ошибка при проверке подозрительных процессов"
     check_repositories || handle_warning "Ошибка при проверке репозиториев"
-    check_malware || handle_warning "Ошибка при проверке на вредоносное ПО"
     
     # Экспорт результатов
     export_results || handle_error "Ошибка при экспорте результатов"
