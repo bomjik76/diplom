@@ -52,16 +52,19 @@ chmod +x server_monitor.sh
 ```
 
 ### Запуск в фоновом режиме
-
 ```bash
-nohup ./server_monitor.sh &
+yum install screen -y
 ```
-
-### Остановка скрипта
-
 ```bash
-pkill -f server_monitor.sh
+screen -S имя_сессии
 ```
+Ctrl+A, затем D чтобы отсоединиться
+### Возврат к screen сессии
+```bash
+screen -r имя_сессии
+```
+### Остановка сессии
+Ctrl+С
 
 ## Формат сообщений
 
