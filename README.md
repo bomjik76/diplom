@@ -103,10 +103,10 @@ pkill -f server_monitor.sh
 ## Запуск и использование
 ```bash
 # Сделать скрипт исполняемым
-chmod +x backup_unified.sh
+chmod +x backup.sh
 # Запустить
 ./backup.sh
-
+```
 далее настройки выполняються через меню
 
 ## Требования
