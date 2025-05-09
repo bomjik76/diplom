@@ -139,7 +139,7 @@ chmod +x security-scanner.sh
 # Запустить
 sudo ./security-scanner.sh
 ```
-
+## Итог скрипта в html файле и выводе в консоли
 ## Требования
 
 - Linux (Red Hat, CentOS, RedOS)
