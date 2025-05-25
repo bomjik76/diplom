@@ -165,7 +165,7 @@ main() {
     configure_selinux
     
     print_message "\nУстановка NextCloud завершена!" "$GREEN"
-    print_message "Пожалуйста, завершите настройку, перейдя по адресу http://$(hostname)" "$GREEN"
+    print_message "Пожалуйста, завершите настройку, перейдя по адресу http://$(hostname)/nextcloud" "$GREEN"
     print_message "Используйте следующие данные для базы данных:" "$YELLOW"
     print_message "База данных: ${db_name}" "$YELLOW"
     print_message "Пользователь БД: ${db_user}" "$YELLOW"
