@@ -129,15 +129,11 @@ check_dependencies() {
     # Массив необходимых пакетов
     local required_packages=(
         "bc"           # Для математических вычислений
-        "rkhunter"     # Для проверки на руткиты
-        "audit"        # Для аудита системы
-        "audit-libs"   # Библиотеки аудита
         "policycoreutils" # Для работы с SELinux
         "firewalld"    # Брандмауэр
         "openssh-server" # SSH сервер
         "sudo"         # Для проверки настроек sudo
         "yum-utils"    # Утилиты для yum
-        "dnf-automatic" # Для автоматических обновлений
     )
     
     local missing_packages=()
@@ -183,12 +179,6 @@ check_dependencies() {
         fi
     else
         echo -e "${GREEN}Все необходимые пакеты установлены.${NC}" | tee -a "$LOG_FILE"
-    fi
-    
-    # Проверка и обновление баз данных rkhunter
-    if command -v rkhunter &>/dev/null; then
-        echo -e "${BLUE}Обновление баз данных rkhunter...${NC}" | tee -a "$LOG_FILE"
-        rkhunter --update --quiet | tee -a "$LOG_FILE"
     fi
     
     return 0
@@ -319,40 +309,6 @@ check_password_policies() {
     fi
 }
 
-# Проверка обновлений безопасности
-check_security_updates() {
-    print_header "Проверка обновлений безопасности"
-    
-    echo "Проверка наличия обновлений безопасности..." | tee -a "$LOG_FILE"
-    yum check-update --security | tee -a "$LOG_FILE"
-    
-    # Получение количества доступных обновлений безопасности
-    security_updates=$(yum check-update --security | grep -c '^[a-zA-Z0-9]')
-    
-    if [ $security_updates -gt 0 ]; then
-        echo -e "${RED}ВНИМАНИЕ: Доступно $security_updates обновлений безопасности.${NC}" | tee -a "$LOG_FILE"
-        echo -e "${YELLOW}Рекомендуется выполнить: sudo yum update --security${NC}" | tee -a "$LOG_FILE"
-    else
-        echo -e "${GREEN}Все обновления безопасности установлены.${NC}" | tee -a "$LOG_FILE"
-    fi
-    
-    # Проверка настроек автоматических обновлений
-    if rpm -q dnf-automatic &> /dev/null || rpm -q yum-cron &> /dev/null; then
-        echo -e "${GREEN}Система настроена для автоматических обновлений.${NC}" | tee -a "$LOG_FILE"
-        
-        if rpm -q dnf-automatic &> /dev/null && [ -f /etc/dnf/automatic.conf ]; then
-            echo -e "\nНастройки dnf-automatic:" | tee -a "$LOG_FILE"
-            grep "apply_updates\|download_updates" /etc/dnf/automatic.conf | tee -a "$LOG_FILE"
-        elif rpm -q yum-cron &> /dev/null && [ -f /etc/yum/yum-cron.conf ]; then
-            echo -e "\nНастройки yum-cron:" | tee -a "$LOG_FILE"
-            grep "apply_updates\|download_updates" /etc/yum/yum-cron.conf | tee -a "$LOG_FILE"
-        fi
-    else
-        echo -e "${YELLOW}Автоматические обновления не настроены.${NC}" | tee -a "$LOG_FILE"
-        echo -e "${YELLOW}Рекомендуется установить dnf-automatic (RHEL 8+) или yum-cron (RHEL 7).${NC}" | tee -a "$LOG_FILE"
-    fi
-}
-
 # Проверка служб SSH
 check_ssh() {
     print_header "Проверка конфигурации SSH"
@@ -397,41 +353,6 @@ check_ssh() {
     fi
 }
 
-# Проверка журналов аудита
-check_audit() {
-    print_header "Проверка настроек аудита"
-    
-    if systemctl is-active --quiet auditd; then
-        echo -e "${GREEN}Служба auditd активна.${NC}" | tee -a "$LOG_FILE"
-        
-        # Проверка конфигурации auditd
-        if [ -f /etc/audit/auditd.conf ]; then
-            echo -e "\nНастройки auditd:" | tee -a "$LOG_FILE"
-            grep "max_log_file\|max_log_file_action\|space_left_action" /etc/audit/auditd.conf | tee -a "$LOG_FILE"
-        fi
-        
-        # Проверка правил аудита
-        echo -e "\nПравила аудита:" | tee -a "$LOG_FILE"
-        auditctl -l | tee -a "$LOG_FILE"
-        
-        # Проверка на наличие ключевых правил аудита
-        if ! auditctl -l | grep -q "time-change"; then
-            echo -e "${YELLOW}ВНИМАНИЕ: Отсутствуют правила аудита для изменений времени.${NC}" | tee -a "$LOG_FILE"
-        fi
-        
-        if ! auditctl -l | grep -q "identity"; then
-            echo -e "${YELLOW}ВНИМАНИЕ: Отсутствуют правила аудита для изменений идентификации пользователей.${NC}" | tee -a "$LOG_FILE"
-        fi
-        
-        if ! auditctl -l | grep -q "system-locale"; then
-            echo -e "${YELLOW}ВНИМАНИЕ: Отсутствуют правила аудита для системных изменений.${NC}" | tee -a "$LOG_FILE"
-        fi
-    else
-        echo -e "${RED}Служба auditd не активна!${NC}" | tee -a "$LOG_FILE"
-        echo -e "${YELLOW}Рекомендуется включить систему аудита.${NC}" | tee -a "$LOG_FILE"
-    fi
-}
-
 # Проверка настроек sudo
 check_sudo() {
     print_header "Проверка настроек sudo"
@@ -451,13 +372,6 @@ check_sudo() {
         else
             echo -e "${GREEN}Настройки NOPASSWD не обнаружены.${NC}" | tee -a "$LOG_FILE"
         fi
-        
-        # Проверка на использование requiretty
-        if grep -q "^Defaults.*requiretty" /etc/sudoers; then
-            echo -e "${GREEN}Включена опция requiretty.${NC}" | tee -a "$LOG_FILE"
-        else
-            echo -e "${YELLOW}Опция requiretty не включена. Рекомендуется включить для повышения безопасности.${NC}" | tee -a "$LOG_FILE"
-        fi
     else
         echo -e "${YELLOW}Файл /etc/sudoers не найден.${NC}" | tee -a "$LOG_FILE"
     fi
@@ -469,15 +383,6 @@ check_services() {
     
     echo -e "Список запущенных служб:" | tee -a "$LOG_FILE"
     systemctl list-units --type=service --state=running | tee -a "$LOG_FILE"
-    
-    # Проверка на наличие небезопасных служб
-    insecure_services=("telnet.service" "rsh.service" "rlogin.service" "vsftpd.service" "nfs.service")
-    
-    for service in "${insecure_services[@]}"; do
-        if systemctl is-active --quiet "$service"; then
-            echo -e "${RED}ВНИМАНИЕ: Обнаружена потенциально небезопасная служба: $service${NC}" | tee -a "$LOG_FILE"
-        fi
-    done
 }
 
 # Проверка SUID/SGID файлов
@@ -523,32 +428,6 @@ check_unused_accounts() {
     fi
 }
 
-# Проверка настроек GRUB
-check_grub() {
-    print_header "Проверка настроек GRUB"
-    
-    if [ -f /boot/grub2/grub.cfg ]; then
-        # Проверка наличия пароля
-        if ! grep -q "password" /boot/grub2/grub.cfg &>/dev/null; then
-            echo -e "${YELLOW}ВНИМАНИЕ: GRUB не защищен паролем.${NC}" | tee -a "$LOG_FILE"
-        else
-            echo -e "${GREEN}GRUB защищен паролем.${NC}" | tee -a "$LOG_FILE"
-        fi
-        
-        # Проверка параметров ядра
-        if grep -q "single" /boot/grub2/grub.cfg &>/dev/null; then
-            echo -e "${YELLOW}ВНИМАНИЕ: Обнаружен параметр 'single' для ядра. Возможен вход в однопользовательский режим.${NC}" | tee -a "$LOG_FILE"
-        fi
-        
-        # Проверка наличия защиты для однопользовательского режима
-        if grep -q "selinux=0" /boot/grub2/grub.cfg &>/dev/null; then
-            echo -e "${RED}ВНИМАНИЕ: Обнаружен параметр 'selinux=0' для ядра.${NC}" | tee -a "$LOG_FILE"
-        fi
-    else
-        echo -e "${YELLOW}Файл конфигурации GRUB не найден.${NC}" | tee -a "$LOG_FILE"
-    fi
-}
-
 # Проверка настроек yum.repos.d
 check_repositories() {
     print_header "Проверка репозиториев"
@@ -559,14 +438,6 @@ check_repositories() {
         
         echo -e "\nАктивные репозитории:" | tee -a "$LOG_FILE"
         yum repolist | tee -a "$LOG_FILE"
-        
-        # Проверка подписей GPG
-        echo -e "\nПроверка настроек GPG:" | tee -a "$LOG_FILE"
-        for repo in /etc/yum.repos.d/*.repo; do
-            if grep -q "gpgcheck=0" "$repo"; then
-                echo -e "${YELLOW}ВНИМАНИЕ: GPG-проверка отключена в репозитории $repo${NC}" | tee -a "$LOG_FILE"
-            fi
-        done
     else
         echo -e "${YELLOW}Каталог /etc/yum.repos.d не найден.${NC}" | tee -a "$LOG_FILE"
     fi
@@ -750,15 +621,12 @@ main() {
     check_selinux || handle_warning "Ошибка при проверке SELinux"
     check_firewalld || handle_warning "Ошибка при проверке firewalld"
     check_password_policies || handle_warning "Ошибка при проверке политики паролей"
-    check_security_updates || handle_warning "Ошибка при проверке обновлений"
     check_ssh || handle_warning "Ошибка при проверке SSH"
-    check_audit || handle_warning "Ошибка при проверке аудита"
     check_sudo || handle_warning "Ошибка при проверке sudo"
     check_services || handle_warning "Ошибка при проверке служб"
     check_setuid_files || handle_warning "Ошибка при проверке SUID/SGID файлов"
     check_uid_zero || handle_warning "Ошибка при проверке UID 0"
     check_unused_accounts || handle_warning "Ошибка при проверке неиспользуемых учетных записей"
-    check_grub || handle_warning "Ошибка при проверке GRUB"
     check_repositories || handle_warning "Ошибка при проверке репозиториев"
     
     # Экспорт результатов
